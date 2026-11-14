@@ -1,0 +1,166 @@
+local gui = script.Parent
+local board = gui:WaitForChild("MainWindow"):WaitForChild("CircuitBoard")
+
+local remote = game.ReplicatedStorage:WaitForChild("GenFixsUi")
+
+local sounds = game:GetService("SoundService")
+local Error = sounds:WaitForChild("UI - Error 1")
+local PokazSoundBilat = sounds:WaitForChild("ui-simple-negative-error")
+local Click = sounds:WaitForChild("Correct_sound1")
+local Correct = sounds:WaitForChild('Correct sound')
+
+local leftPanel = board:WaitForChild("LeftPanel")
+local rightPanel = board:WaitForChild("RightPanel")
+
+local leftGrid = leftPanel:WaitForChild("Grid")
+local rightGrid = rightPanel:WaitForChild("Grid")
+
+local leftRow1 = leftPanel:WaitForChild("ContactsRow1")
+local leftRow2 = leftPanel:WaitForChild("ContactsRow2")
+
+local rightRow1 = rightPanel:WaitForChild("ContactsRow1")
+local rightRow2 = rightPanel:WaitForChild("ContactsRow2")
+
+local buttons = {
+	Left = {},
+	Right = {},
+}
+
+local contacts = {
+	LeftRow1 = {},
+	LeftRow2 = {},
+	RightRow1 = {},
+	RightRow2 = {},
+}
+
+for _, cell in ipairs(leftGrid:GetChildren()) do
+	if cell:IsA("Frame") then
+		buttons.Left[cell.Name] = cell
+		print('added ' .. cell.Name .. ' to left')
+	end
+end
+
+for _, button in ipairs(rightGrid:GetChildren()) do
+	if button:IsA("GuiButton") then
+		buttons.Right[button.Name] = button
+		print('added ' .. button.Name .. ' to right')
+	end
+end
+
+for _, contact in ipairs(leftRow1:GetChildren()) do
+	if contact:IsA("ImageLabel") then
+		contacts.LeftRow1[contact.Name] = contact
+		print('added ' .. contact.Name .. ' to left')
+	end
+end
+
+for _, contact in ipairs(leftRow2:GetChildren()) do
+	if contact:IsA("ImageLabel") then
+		contacts.LeftRow2[contact.Name] = contact
+		print('added ' .. contact.Name .. ' to left')
+	end
+end
+
+for _, contact in ipairs(rightRow1:GetChildren()) do
+	if contact:IsA("ImageLabel") then
+		contacts.RightRow1[contact.Name] = contact
+		print('added ' .. contact.Name .. ' to right')
+	end
+end
+
+for _, contact in ipairs(rightRow2:GetChildren()) do
+	if contact:IsA("ImageLabel") then
+		contacts.RightRow2[contact.Name] = contact
+		print('added ' .. contact.Name .. ' to right')
+	end
+end
+
+local sequence = {}
+local answerIndex = 1
+local showing = false
+local active = false
+local maxStages = 5
+
+local function showSequence()
+	showing = true
+	
+	task.wait(0.4)
+	contacts.LeftRow2["Contact" .. #sequence].Visible = true
+	for _, number in ipairs(sequence) do
+		local Fram = buttons.Left["Cell" .. number]
+		Fram.Visible = true
+		PokazSoundBilat:Play()
+		task.wait(0.5)
+		Fram.Visible = false
+		task.wait(0.2)
+	end
+
+	showing = false
+end
+gui:GetPropertyChangedSignal("Enabled"):Connect(function()
+	if gui.Enabled then
+		print(gui.Name, "открыт")
+		local rando = math.random(1, 9)
+		sequence = {rando}
+		active = true
+		leftRow2.Visible = true
+		rightRow2.Visible = true
+
+		for i = 1, maxStages do
+			contacts.LeftRow2["Contact" .. i].Visible = false
+			contacts.RightRow2["Contact" .. i].Visible = false
+		end
+		answerIndex = 1
+		showSequence()
+		
+	else
+		print(gui.Name, "Close")
+		active = false
+	end
+end)
+
+for i = 1, 9 do
+	local number = i
+	local button = buttons.Right["Cell" .. number]
+
+	button.Activated:Connect(function()
+		if not active or showing then return end
+		
+		button.Transparency = 0.4
+		task.delay(0.3, function()
+			button.Transparency = 1
+		end)
+
+		if sequence[answerIndex] == number then
+			answerIndex += 1
+			Click:Play()
+			print("Correct:", number)
+			task.wait(0.5)
+			if answerIndex > #sequence then
+				contacts.RightRow2["Contact" .. #sequence].Visible = true
+				if #sequence >= maxStages then
+					Correct:Play()
+					active = false
+					
+					remote:FireServer()
+					
+					
+					gui.Enabled = false
+				else
+					table.insert(sequence, math.random(1, 9))
+					answerIndex = 1
+					showSequence()
+				end
+			end
+		else
+			Error:Play()
+			answerIndex = 1
+			local col = button.BackgroundColor3
+			button.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+			task.delay(0.5,function()
+				button.BackgroundColor3 = col
+			end)
+			showSequence()
+		end
+	end)
+end
