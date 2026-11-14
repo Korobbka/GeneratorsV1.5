@@ -73,7 +73,6 @@ for _, container in ipairs(wirePanel:GetChildren()) do
 				count+=1
 				if count>=5 then
 					gui.Enabled=false
-					remote:FireServer()
 					count=0
 					connectedColors = {}
 					remote:FireServer()
