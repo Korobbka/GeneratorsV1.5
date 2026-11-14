@@ -1,0 +1,68 @@
+local gui = script.Parent
+local remote = game.ReplicatedStorage:WaitForChild("GenFixsUi")
+local Main = gui:WaitForChild("MainWindow")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GuiTouch = require(ReplicatedStorage:WaitForChild("GuiTouch"))
+local sounds = game:GetService("SoundService")
+local Correct = sounds:WaitForChild('Correct sound')
+local Error = sounds:WaitForChild("UI - Error 1")
+local UIS = game:GetService("UserInputService")
+local Labrys = {
+	Main:WaitForChild("Labry1"),
+	Main:WaitForChild("Labry2"),
+	
+}
+local Dragging = false
+local activeInput = nil
+
+
+local selectedBoard
+local detector
+gui:GetPropertyChangedSignal("Enabled"):Connect(function()
+	if gui.Enabled then
+		local selected = Labrys[math.random(1, #Labrys)]
+		local fakeMouse = selected:WaitForChild("Frame"):FindFirstChild('FakeMouse')
+		local Stena = selected:WaitForChild("Frame"):FindFirstChild('Stena')
+		if fakeMouse and Stena then
+			fakeMouse.Visible = true
+			local dragDetector = fakeMouse.UIDragDetector
+			local startPos = fakeMouse.Position
+			detector = GuiTouch.new(fakeMouse, {
+				Filter = {'Name:Frame', 'Name:B'},
+				Container = Stena,
+				Mode = "Bounds",
+				
+			})
+			detector.Touched:Connect(function(object)
+				dragDetector.Enabled = false
+				if object.Name == "B" then
+					Correct:Play()
+					dragDetector.Enabled = true
+					gui.Enabled = false
+					remote:FireServer()
+					print('b')
+					return
+				end
+				fakeMouse.Position = startPos
+				Error:Play()
+				print("rоснулся:", object.Name)
+				task.wait(0.5)
+				dragDetector.Enabled = true
+			end)
+			
+		end
+		
+		for _, labry in ipairs(Labrys) do
+			labry.Visible =(labry == selected)
+
+		end
+	else
+		
+		if detector ~= nil then
+			detector:Destroy()
+			detector = nil
+			
+		end
+		
+	end
+end)
