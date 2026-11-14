@@ -1,0 +1,95 @@
+local player = game.Players.LocalPlayer
+local remote = game.ReplicatedStorage:WaitForChild("GenFixsUi")
+local playerGui = player:WaitForChild("PlayerGui")
+local Energy = playerGui:WaitForChild("Energy"):WaitForChild("EnergyCalibrationGui")
+local Labyr = playerGui:WaitForChild("Labyr"):WaitForChild("LABYRINTHGui")
+local Wire = playerGui:WaitForChild("Wire"):WaitForChild("WireConnectionGui")
+local positions = nil
+
+local Sounds = game:GetService("SoundService")
+local sound = Sounds:WaitForChild("Dandy's World Machine Complete Sound")
+
+if not Energy then
+	print("Energy not found")
+end
+if not Labyr then
+	print("Labyr not found")
+end
+if not Wire then
+	print("Wire not found")
+end
+local function Enabled(state)
+	Energy.Enabled = state
+	Labyr.Enabled = state
+	Wire.Enabled = state
+end
+
+local UI = {
+	Energy = Energy,
+	Labyr = Labyr,
+	Wire = Wire,
+}
+Enabled(false)
+remote.OnClientEvent:Connect(function(generator, info)
+	if generator == 'close' then
+		Enabled(false)
+		positions = nil
+		return
+	end
+
+	local char = player.Character
+	if not char then return end
+	local humanoid = char:FindFirstChild("Humanoid")
+	if not humanoid then return end
+	if humanoid.Health <= 0 then return end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	Enabled(false)
+	positions = nil
+
+	local gui = UI[info]
+	if not gui then return end
+
+	positions = hrp.Position
+	gui.Enabled = true
+	
+	
+	print('LOCAL: fixing gen ' .. generator.Name)
+end)
+
+
+while true do
+	task.wait(0.10)
+	if not positions then
+		continue
+	end
+	local char = player.Character
+	if not char then
+		Enabled(false)
+		positions = nil
+		continue
+	end
+	local humanoid = char:FindFirstChild("Humanoid")
+	if not humanoid then 
+		Enabled(false)
+		positions = nil
+		continue
+	end	
+	if humanoid.Health <= 0 then
+		Enabled(false)
+		positions = nil
+		continue
+	end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then Enabled(false)
+		positions = nil
+		continue
+	end
+
+	local distance = (hrp.Position-positions).Magnitude
+	if distance > 0.5 then 
+		Enabled(false)
+		positions = nil
+	end
+
+end
