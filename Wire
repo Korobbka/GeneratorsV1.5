@@ -1,0 +1,98 @@
+local gui = script.Parent
+local remote = game.ReplicatedStorage:WaitForChild("GenFixsUi")
+local Main = gui:WaitForChild("MainWindow")
+local ConnectionProgress = Main:WaitForChild("ConnectionProgressWindow")
+local sounds = game:GetService("SoundService")
+local Correct = sounds:WaitForChild('Correct sound')
+local Error = sounds:WaitForChild("UI - Error 1")
+local wirePanel = Main:WaitForChild("WireBoard"):WaitForChild('WirePanel')
+local Progres = ConnectionProgress:WaitForChild("ProgressCard"):WaitForChild('ProgressContent'):WaitForChild('ProgressBar'):WaitForChild('ProgressBarFill')
+local ProgresTXT = Progres.Parent.Parent:WaitForChild('ProgressPercentLabel')
+local Twen = game:GetService("TweenService")
+local Info = TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local goal = {Size = UDim2.new(1, 0,1.003, 0)}
+local tween = Twen:Create(Progres,Info, goal)
+
+Progres.Size = UDim2.new(1, 0,0.058, 0)
+
+local wire = {
+	Left = {},
+	Right = {},
+}
+local isAnimating = false
+local count = 0
+local selectedColor = nil
+local connectedColors = {}
+ConnectionProgress.Visible=false
+for _, container in ipairs(wirePanel:GetChildren()) do
+	local side, color = container.Name:match("^(Left)(.+)$")
+
+	if not side then
+		side, color = container.Name:match("^(Right)(.+)$")
+	end
+	
+	if side then
+		local socket = container:WaitForChild("Socket" .. color)
+
+		local line = nil
+		if side == "Left" then
+			line = socket:WaitForChild("Button" .. color)
+		end
+
+		wire[side][color] = {
+			Socket = socket,
+			Line = line,
+		}
+		
+		socket.Activated:Connect(function()
+			if not gui.Enabled or connectedColors[color] or isAnimating then
+				return
+			end
+			
+			if side == "Left" then
+				selectedColor = color
+				
+				return
+			end
+
+			if selectedColor == color then
+				isAnimating = true
+	
+				connectedColors[color] = true
+				selectedColor = nil
+				Correct:Play()
+				print("Correct:", color)
+				ConnectionProgress.Visible=true
+				tween:Play()
+				tween.Completed:Wait()
+
+				Progres.Size = UDim2.new(1, 0,0.058, 0)
+				isAnimating = false
+				ConnectionProgress.Visible=false
+				wire.Left[color].Line.Visible = true
+				count+=1
+				if count>=5 then
+					gui.Enabled=false
+					remote:FireServer()
+					count=0
+					connectedColors = {}
+					remote:FireServer()
+					for _, data in pairs(wire.Left) do
+						data.Line.Visible = false
+					end
+					return
+				end
+			else
+				Error:Play()
+				print("error")
+			end
+		end)
+	
+	end
+end
+
+gui:GetPropertyChangedSignal("Enabled"):Connect(function()
+	if gui.Enabled then
+		Main.Visible = true
+	end
+end)
