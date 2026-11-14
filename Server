@@ -1,0 +1,200 @@
+local event = game.ReplicatedStorage:WaitForChild("GeneratorPressed")
+local gensInfo = {}
+local fixGenPlayers = {}
+local spawns = game.Workspace:WaitForChild("spawn"):GetChildren()
+local gen = game.Workspace:WaitForChild("Generators")
+local v = gen:WaitForChild("Generator")
+local player = game:GetService('Players')
+local clonsFolder = game.Workspace.ClonsGens
+local remote = game.ReplicatedStorage:WaitForChild("GenFixsUi")
+local Sounds = game:GetService("SoundService")
+local sound = Sounds:WaitForChild("HV door metal open")
+local EveryoneGames = {"Energy", "Labyr", "Wire"}
+local miniGamesForGen = table.clone(EveryoneGames)
+local completGens = 0 
+local lastFireClient = {}
+
+player.PlayerAdded:Connect(function(plr) --ПОТОМ ЗАМЕНИТЬ НА СТАРТ РАУНДА, ПЛЕЕР АДЕД КОСТЫЛЬ 
+	print('player joined ' .. plr.Name)
+	local amount = math.min(4, #spawns)
+	for i=1, amount do
+
+		if #spawns == 0  then
+			break
+		end
+		local index = math.random(1, #spawns)
+		local point = table.remove(spawns, index)
+
+		local clone = v:Clone()
+		clone.Parent = clonsFolder 
+		clone.CFrame = point.CFrame
+		local miniGame
+		if #miniGamesForGen == 0 then
+			local random = math.random(1, #EveryoneGames)
+			miniGame = EveryoneGames[random]
+		else
+			local random = math.random(1, #miniGamesForGen)
+			miniGame = table.remove(miniGamesForGen, random)
+		end
+
+
+
+		local info = {
+			['Gen'] = clone,
+			['Players'] = {},
+			['CompletedLevels'] = 0,
+			['Completed'] = false,
+			['MiniGame'] = miniGame
+		}
+		gensInfo[clone] = info
+		print('gen added ' .. v.Name)
+	end
+end)
+
+event.Event:Connect(function(plr, generator)
+
+	print('pressed player ' .. plr.Name)
+	local info = gensInfo[generator]
+	if not info then return end
+	print(info)
+	if info.Completed == true then
+		print('repaired')
+		return
+	end
+
+
+	local char = plr.Character
+	if not char then return end	
+	local humanoid = char:FindFirstChild("Humanoid")
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not humanoid or not hrp then return end
+	if humanoid.Health <= 0 then return end
+	if fixGenPlayers[plr] then return end
+
+	local distance = (hrp.Position-generator.Position).Magnitude
+	if distance > 10 then
+		print('too far')
+		return
+	end
+	local spoot = nil
+	local minDistance = math.huge
+	
+	for _, spot in pairs(generator:GetChildren()) do
+		if spot:IsA("Attachment") and not info.Players[spot] then
+			local distance = (hrp.Position - spot.WorldPosition).Magnitude
+			if distance < minDistance then
+				minDistance = distance
+				spoot = spot
+			end
+		end
+	end
+	if not spoot then
+		print('no free spots')
+		return
+	end
+
+	info.Players[spoot] = plr
+	local point = spoot.WorldPosition
+	local target = Vector3.new(generator.Position.X, point.Y, generator.Position.Z)
+	local facing = CFrame.lookAt(point, target)
+	print(spoot.Position, generator.Position)
+	local currentTime = os.clock()
+	hrp.CFrame = facing
+	sound:Play()
+	fixGenPlayers[plr] = {
+		Generator = generator,
+		Spot = spoot,
+		Character = char,
+		StartPosition = hrp.Position,
+	}
+	lastFireClient[plr] = currentTime
+	remote:FireClient(plr, generator,info.MiniGame)	
+end)
+
+local function stopRepair(plr)
+
+	local repair = fixGenPlayers[plr]
+	if not repair then return end
+
+	local info = gensInfo[repair.Generator]
+	if info then
+		info.Players[repair.Spot] = nil
+	end
+	fixGenPlayers[plr] = nil
+	fixGenPlayers[plr] = nil
+	remote:FireClient(plr, "close")
+end
+
+
+
+
+remote.OnServerEvent:Connect(function(plr)
+	local repair = fixGenPlayers[plr]
+	if not repair then return end
+	local generator = repair.Generator
+
+	if not generator then return end
+	local info = gensInfo[generator]                                                                                                                                                                            ---пися
+	if not info then return end
+	if info.Completed then return end
+	local char = plr.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	local humanoid = char and char:FindFirstChild("Humanoid")
+	
+	if char ~= repair.Character then return end
+	if not hrp or not humanoid or humanoid.Health <= 0 then return end
+	if (hrp.Position - repair.StartPosition).Magnitude > 0.3 then return end
+	local currentTime = os.clock()
+
+	if not lastFireClient[plr] or (currentTime - lastFireClient[plr]) < 10 then
+		stopRepair(plr)
+		print('NE TAK BISTRO!')
+		return
+	end
+
+	info.CompletedLevels = 4
+	info.Completed = true
+	completGens += 1
+
+	print('completed ' .. generator.Name)
+	print('SERVER: Completed GENERATORS: ' .. completGens)
+
+	for spot, fixingPlayer in pairs(info.Players) do
+		stopRepair(fixingPlayer)
+	end
+
+	if completGens >= 4 then
+		warn('WIN')
+	end
+end)
+
+player.PlayerRemoving:Connect(function(plr)
+	stopRepair(plr)
+end)
+
+while true do
+	for plr, v in pairs(fixGenPlayers) do
+
+		local info = gensInfo[v.Generator]
+		if not info then
+			stopRepair(plr)
+			continue
+		end
+		local char = v.Character
+		if not char then stopRepair(plr) continue end
+		---------
+		local humanoid = char:FindFirstChild("Humanoid")
+		if not humanoid then stopRepair(plr) continue end
+		if humanoid.Health <= 0 then stopRepair(plr) continue end
+		-----------
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+		if not hrp then stopRepair(plr) continue end
+		--------
+
+		local distance = (hrp.Position-v.StartPosition).Magnitude
+		if distance > 0.5 then 
+			stopRepair(plr)
+		end
+	end
+	task.wait(0.10)
+end
