@@ -14,7 +14,7 @@ local miniGamesForGen = table.clone(EveryoneGames)
 local completGens = 0 
 local lastFireClient = {}
 
-player.PlayerAdded:Connect(function(plr) --ПОТОМ ЗАМЕНИТЬ НА СТАРТ РАУНДА, ПЛЕЕР АДЕД КОСТЫЛЬ 
+player.PlayerAdded:Connect(function(plr)
 	print('player joined ' .. plr.Name)
 	local amount = math.min(4, #spawns)
 	for i=1, amount do
